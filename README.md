@@ -1,5 +1,6 @@
 # Overview
 The purpose of these tests is to better understand the various circuit breaker libraries for Go applications. In general, the idea is to see how well each of the libraries supports the [circuit breaker pattern as defined by Martin Fowler](http://martinfowler.com/bliki/CircuitBreaker.html). This is not a rigorous evaluation per Martin Fowler's definition however. My needs were specific to the following capabilities:
+
 1. Support for rolling windows - i.e., stats age out over time
 1. Support for tripping circuit when failure rate exceeds a threshold (e.g., 50% over the last 10 calls or last 10 seconds when at least `n` calls have been made)
 1. Support for other circuit breaker characteristics such as tripping after a set number of consecutive failures.
