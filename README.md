@@ -32,6 +32,7 @@ Run a specific test
 
 # [github.com/dahernan/goHystrix](https://github.com/dahernan/goHystrix)
 Evaluation results:
+
 1. Has support for rolling windows - i.e., stats age out over time
 1. Has support for tripping circuit when failure rate exceeds a threshold (e.g., 50% over the last 10 calls or last 10 seconds when at least `n` calls have been made)
 1. Has support for other circuit breaker characteristics such as tripping after a set number of consecutive failures.
