@@ -5,8 +5,15 @@ The purpose of these tests is to better understand the various circuit breaker l
 1. Support for tripping circuit when failure rate exceeds a threshold (e.g., 50% over the last 10 calls or last 10 seconds when at least `n` calls have been made)
 1. Support for other circuit breaker characteristics such as tripping after a set number of consecutive failures.
 1. Support for `half-open` circuit state.
+1. Support for call timeout and ability to disable said support, i.e., set the timeout to infinity.
 1. Provides access to the current health state of the circuit breaker.
-1. Support for integrated fallback behavior.
+1. Support for integrated fallback behavior. I.e., accepts a "fallback" function to be called by the library in-place of the original function if the original function fails.
+1. Is relatively current with regard to recent commit history (as of April 17, 2016)
+
+**Caveats:**
+
+1. I inspected library code where necessary to better understand the intended behavior of the libraries evaluated. This was primarily because the documentation across the libraries was a little light. My reading of the code may or may not match the intended behavior of one or more libraries in this evaluation. It's also possible that I misread the code. I'll happily accept updates, clarifications, and corrections to any and all of this review.
+1. The evaluation code served my purposes. It is likely that additional comments and/or code changes could be made to make the code more generally useful and/or illuminate how the libriaries are intended to be used.
 
 # Running the tests
 There is a test file for the libraries that met an initial evaluation made by looking at README files and code.
@@ -25,34 +32,48 @@ Run a specific test
 
 # [github.com/dahernan/goHystrix](https://github.com/dahernan/goHystrix)
 Evaluation results:
-
-1.	Has great support for access to metrics
-2.	Has support for call duration metrics
-3.	Has no support for a half-open circuit breaker. That is, after the circuit breaker opens, and there continue to be requests at a rate that exceeds the `NumberOfSecondsToStore`, then the circuit breaker will never recover. It will stay open.
-4. 	Has no concept of disabling the timeout (i.e., infinite timeout)
-5. 	Last significant commit was in 2014
-
-	What this library needs is the support for a half-open circuit breaker state.
+1. Has support for rolling windows - i.e., stats age out over time
+1. Has support for tripping circuit when failure rate exceeds a threshold (e.g., 50% over the last 10 calls or last 10 seconds when at least `n` calls have been made)
+1. Has support for other circuit breaker characteristics such as tripping after a set number of consecutive failures.
+1. DOES NOT support `half-open` circuit state.
+    1. After the circuit breaker opens, and there continue to be requests at a rate that exceeds the `NumberOfSecondsToStore`, then the circuit breaker will never recover. It will stay open.
+1. Supports call timeouts, doesn't allow for completely disabling it though.
+1. Provides excellent access to the current health state of the circuit breaker.
+    1. Unique among all the libraries was access to call duration metrics.
+	1. It also supports http and statsd interfaces.
+1. Has support for integrated fallback behavior.
+1. The last commit, to the README, was made in January 2016. The last significant commit was made June 6, 2014.
 
 # [github.com/afex/hystrix-go](https://github.com/afex/hystrix-go)
 Evaluation results:
 
-1.	Support for closed, half-open, and open states.
-2.	Doesn't allow access to any circuit breaker stats except whether or not it's open or closed.
-3. 	Has no concept of a disabled, infinite, timeout.
-4. 	Is in active development, commits in 2016
-5. 	Integrates with any external http client (e.g., Turbine) to publish stats externally.
-
-	What this library needs is to allow access to the circuit breaker stats. Instead they're mixed in with the overall control of the circuit breaker state. This makes it dangerous to expose the states because it also exposes the internal workings of the circuit breaker.
+1. Has support for rolling windows - i.e., stats age out over time
+1. Has support for tripping circuit when failure rate exceeds a threshold (e.g., 50% over the last 10 calls or last 10 seconds when at least `n` calls have been made)
+1. Has support for other circuit breaker characteristics such as tripping after a set number of consecutive failures.
+1. Has support `half-open` circuit state.
+1. Supports call timeouts, doesn't allow for completely disabling it though.
+1. DOES NOT provide programmatic access to the current health state of the circuit breaker.
+    1. It does provide HTTP and Statsd interfaces for metrics though.
+1. Has support for integrated fallback behavior.
+1. The last commit was made September 8, 2015.
 
 # [github.com/rubyist/circuitbreaker](https://github.com/rubyist/circuitbreaker)
 Evaluation results:
 
-1.	No integrated support for a fallback function. Fallback behavior has to be manually integrated into the circuit breaker mechanism.
-2.	Nice, can disable timeout (i.e., make infinite).
-3. 	Is in active development, commits in 2016
-4. 	It only supports sync calls, no asycn support
-5. 	Calls to cb.Ready() have side effects that turn a half-open circuit to closed. So a first call to Ready() may return true but calling it again (e.g., in a cb.Call() invocation) will return false.
+1. Has support for rolling windows - i.e., stats age out over time
+1. Has support for tripping circuit when failure rate exceeds a threshold (e.g., 50% over the last 10 calls or last 10 seconds when at least `n` calls have been made)
+1. Has support for other circuit breaker characteristics such as tripping after a set number of consecutive failures.
+1. Has support `half-open` circuit state.
+1. Supports call timeouts INCLUDING the ability to disable call timeouts.
+1. Provides access to the current health state of the circuit breaker.
+1. DOES NOT support integrated fallback behavior.
+    1. Although not ideal, it is possible to manually implement a fallback strategy using other public functions (primitives) of the library. This does impose a responsibility on the user to correctly use these primitives to build up a working circuit breaker.
+1. The last commit was made February 2, 2016.
+
+Other items of note include:
+
+1. 	It only supports sync calls, no async support
+2. 	Calls to `Breaker.Ready()` have side effects that turn a half-open circuit to closed. So a first call to `Ready()` may return true but calling it again (e.g., in a `Breaker.Call()` invocation) will return false. Lesson learned, don't use `Breaker.Ready()` to test the status of a circuit breaker if you are also using `Breaker.Call()`.
 
 # [github.com/eapache/go-resiliency](https://github.com/eapache/go-resiliency)
 Looked at eapache/go-resiliency as an alternative, but it doesn't allow access to metrics so no further evaluation was performed.
