@@ -38,12 +38,25 @@ Evaluation results:
 1. Has support for other circuit breaker characteristics such as tripping after a set number of consecutive failures.
 1. DOES NOT support `half-open` circuit state.
     1. After the circuit breaker opens, and there continue to be requests at a rate that exceeds the `NumberOfSecondsToStore`, then the circuit breaker will never recover. It will stay open.
+	1. It has what looks like a "leaky bucket" approach to letting the circuit breaker reset itself giving it behavior similar to a "half-open" approach. However, I couldn't get this to work in my tests. Once the circuit breaker tripped it stayed tripped regardless of how many attempts to run successful commands were tried over a long time period (i.e., longer than `NumberOfSecondsToStore` and `NumberOfSamplesToStore`).
 1. Supports call timeouts, doesn't allow for completely disabling it though.
 1. Provides excellent access to the current health state of the circuit breaker.
     1. Unique among all the libraries was access to call duration metrics.
 	1. It also supports http and statsd interfaces.
 1. Has support for integrated fallback behavior.
 1. The last commit, to the README, was made in January 2016. The last significant commit was made June 6, 2014.
+
+# [github.com/dahernan/breaker](https://github.com/dahernan/breaker)
+This is a followup to goHystrix by the same author. I didn't have time to test it, but it looks similar to goHystrix with the following differences:
+
+1. It has a simpler API
+1. It doesn't have integrated fallback capability
+1. It doesn't support async calls
+1. It doesn't support timeouts
+1. The metrics capabilities aren't as rich as goHystrix, but they are more than adequate.
+    1. Metrics aren't exposed via statsd or http.
+1. Like goHystrix it uses a "leaky bucket" approach to letting the circuit breaker reset itself. Since I didn't have time to fully test the library I can't say if I would get different results with this library than with goHystrix.
+
 
 # [github.com/afex/hystrix-go](https://github.com/afex/hystrix-go)
 Evaluation results:

@@ -22,12 +22,21 @@ import (
 	"github.com/dahernan/goHystrix"
 )
 
+var (
+	errThrshd       = 45.0
+	minRqsts        = 10
+	windowSecs      = 5
+	sampleSize      = 50
+	rqstTimeoutSecs = 5
+)
+
 type MyStringCommand struct {
-	message string
+	message      string
+	failRandomly bool
 }
 
 func (c *MyStringCommand) Run() (interface{}, error) {
-	err := testDependency()
+	err := testRandomFailure(c.failRandomly)
 	return c.message, err
 }
 
@@ -36,7 +45,7 @@ func (c *MyStringCommand) Fallback() (interface{}, error) {
 }
 
 func TestSimpleGoHystrix(t *testing.T) {
-	command, circuit, rqstTimeoutSecs := initCmd()
+	command, circuit, rqstTimeoutSecs := getRandomlyFailingCommand()
 
 	for i := 0; i < 20; i++ {
 		open, msg := circuit.IsOpen()
@@ -51,8 +60,10 @@ func TestSimpleGoHystrix(t *testing.T) {
 	// AT ALL during the `NumberOfSecondsToStore` interval.
 	fmt.Printf("\n\nContinue running commands at a slower rate to allow prior stats to roll-out of the time window (of %d seconds)\n\n", rqstTimeoutSecs)
 	//time.Sleep(time.Duration(int(float64(rqstTimeoutSecs)*1.5)) * time.Second)
-	runSlower(command, rqstTimeoutSecs*1000)
+	cmd2, crct2, _ := getSuccessCommand()
+	runSlower(cmd2, crct2, rqstTimeoutSecs*1000)
 
+	fmt.Printf("\n\nReturn to randomly failing commands\n\n")
 	for i := 0; i < 20; i++ {
 		open, msg := circuit.IsOpen()
 		result, _ := command.Execute()
@@ -63,25 +74,22 @@ func TestSimpleGoHystrix(t *testing.T) {
 	fmt.Printf("\n\n\n")
 }
 
-func runSlower(c *goHystrix.Command, timeToRunMillis int) {
-	numLoops := 20
-	sleepIntervalMs := int(float32(timeToRunMillis/numLoops) * 1.5)
-	for i := 0; i < 20; i++ {
-		c.Execute()
+func runSlower(c *goHystrix.Command, circuit *goHystrix.CircuitBreaker, timeToRunMillis int) {
+	numLoops := sampleSize + 1
+	sleepIntervalMs := int(float32(timeToRunMillis/numLoops) * 2.0)
+	for i := 0; i < numLoops; i++ {
+		open, msg := circuit.IsOpen()
+		result, _ := c.Execute()
+		fmt.Printf("Round %d;\t Is circuit open?\t %t; reason is\t %s; Result:\t %s\n", i, open, msg, result)
 		time.Sleep(time.Duration(sleepIntervalMs) * time.Millisecond)
 	}
 
 }
 
-func initCmd() (*goHystrix.Command, *goHystrix.CircuitBreaker, int) {
-	errThrshd := 45.0
-	minRqsts := 10
-	windowSecs := 5
-	sampleSize := 50
-	rqstTimeoutSecs := 5
+func getRandomlyFailingCommand() (*goHystrix.Command, *goHystrix.CircuitBreaker, int) {
 
 	// The combination of "stringGroup" & "stringMessage" define a Circuit Breaker and its associated stats
-	command := goHystrix.NewCommandWithOptions("stringMessage", "stringGroup", &MyStringCommand{"helloooooooo"},
+	command := goHystrix.NewCommandWithOptions("stringMessage", "stringGroup", &MyStringCommand{message: "helloooooooo", failRandomly: true},
 		goHystrix.CommandOptions{
 			ErrorsThreshold:        errThrshd,                                    // Percent errors to trip CB
 			MinimumNumberOfRequest: int64(minRqsts),                              // Total number of requests before CB can trip
@@ -89,8 +97,6 @@ func initCmd() (*goHystrix.Command, *goHystrix.CircuitBreaker, int) {
 			NumberOfSamplesToStore: sampleSize,                                   // Max number of requests used in the error percentage calc
 			Timeout:                time.Duration(rqstTimeoutSecs) * time.Second, // How long to wait before request times out
 		})
-
-	fmt.Printf("\nStart Test\n")
 
 	circuits := goHystrix.Circuits()
 	circuit, ok := circuits.Get("stringGroup", "stringMessage")
@@ -108,36 +114,30 @@ func initCmd() (*goHystrix.Command, *goHystrix.CircuitBreaker, int) {
 	return command, circuit, rqstTimeoutSecs
 }
 
-//func TestString(t *testing.T) {
-//	// Sync execution
-//	command := goHystrix.NewCommand("stringMessage", "stringGroup", &MyStringCommand{"helloooooooo"})
-//
-//	circuits := goHystrix.Circuits()
-//	circuit, ok := circuits.Get("stringGroup", "stringMessage")
-//	if !ok {
-//		log.Fatal("Arg, no circuits!!!!")
-//	}
-//
-//	for i := 0; i < 20; i++ {
-//		open, msg := circuit.IsOpen()
-//		fmt.Printf("Round %d; circuit is open %t; reason is %s\n", i, open, msg)
-//		command.Execute()
-//	}
-//
-//	fmt.Printf("\nRSY stats\n\n")
-//	fmt.Println("\tRSY: Count Bucket calls:\t", command.HealthCounts().HealthCountsBucket)
-//	fmt.Println("\tRSY: Total calls:\t\t", command.HealthCounts().Total)
-//	fmt.Println("\tRSY: Successful calls:\t\t", command.HealthCounts().Success)
-//	fmt.Println("\tRSY: Failed calls:\t\t", command.HealthCounts().Failures)
-//	fmt.Println("\tRSY: Error Percentage:\t\t", command.HealthCounts().ErrorPercentage)
-//	fmt.Println("")
-//	fmt.Println("\tRSY: Stats Count:\t\t", command.Metric().Stats().Count(), "(only successes are counted)")
-//	fmt.Println("\tRSY: Max Exec Time:\t\t", command.Metric().Stats().Max()/1000000, "ms")
-//	fmt.Println("\tRSY: Min Exec Time:\t\t", command.Metric().Stats().Min()/1000000, "ms")
-//	fmt.Println("\tRSY: Mean Exec Time:\t\t", command.Metric().Stats().Mean()/1000000, "ms")
-//	fmt.Println("\tRSY: Stats 50 Percentile:\t", command.Metric().Stats().Percentile(0.50)/1000000, "ms")
-//	fmt.Println("\tRSY: Stats 90 Percentile:\t", command.Metric().Stats().Percentile(0.90)/1000000, "ms")
-//
-//	fmt.Printf("\n\n\n")
-//}
-//
+func getSuccessCommand() (*goHystrix.Command, *goHystrix.CircuitBreaker, int) {
+
+	// The combination of "stringGroup" & "stringMessage" define a Circuit Breaker and its associated stats
+	command := goHystrix.NewCommandWithOptions("stringMessage", "stringGroup", &MyStringCommand{message: "helloooooooo", failRandomly: false},
+		goHystrix.CommandOptions{
+			ErrorsThreshold:        errThrshd,                                    // Percent errors to trip CB
+			MinimumNumberOfRequest: int64(minRqsts),                              // Total number of requests before CB can trip
+			NumberOfSecondsToStore: windowSecs,                                   // Time window, stats > setting will roll out of the window
+			NumberOfSamplesToStore: sampleSize,                                   // Max number of requests used in the error percentage calc
+			Timeout:                time.Duration(rqstTimeoutSecs) * time.Second, // How long to wait before request times out
+		})
+
+	circuits := goHystrix.Circuits()
+	circuit, ok := circuits.Get("stringGroup", "stringMessage")
+	if !ok {
+		log.Fatal("Argh, no circuits!!!!")
+	}
+
+	fmt.Printf("\nCircuit Breaker settings:\n")
+	fmt.Printf("\tError threshold:\t\t: %f \n", errThrshd)
+	fmt.Printf("\tMin rqst threshold\t\t: %d\n", minRqsts)
+	fmt.Printf("\tWindow size (seconds)\t\t: %d\n", windowSecs)
+	fmt.Printf("\tSample size\t\t\t: %d\n", sampleSize)
+	fmt.Printf("\tRequest timeout (seconds)\t: %d\n\n", rqstTimeoutSecs)
+
+	return command, circuit, rqstTimeoutSecs
+}

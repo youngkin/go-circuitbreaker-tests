@@ -4,11 +4,9 @@ Evaluation results:
 	2.	Doesn't allow access to any circuit breaker stats except whether or not it's open or closed.
 	3. 	Has no concept of a disabled, infinite, timeout.
 	4. 	Is in active development, commits in 2016
-	5. 	Integrates with any external http client (e.g., Turbine) to publish stats externally.
+	5. 	Integrates with any external statsd or http client (e.g., Turbine) to publish stats externally.
 
-	What this library needs is to allow access to the circuit breaker stats. Instead they're mixed in
-	with the overall control of the circuit breaker state. This makes it dangerous to expose the states
-	because it also exposes the internal workings of the circuit breaker.
+	What would make this library great is programmatic access to circuit breaker state information.
 */
 
 package cbtests

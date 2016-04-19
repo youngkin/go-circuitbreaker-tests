@@ -8,15 +8,19 @@ import (
 	"github.com/dahernan/goHystrix"
 )
 
-func testDependency() error {
+func testRandomFailure(failRandomly bool) error {
 	rand.Seed(time.Now().UnixNano())
 	time.Sleep(time.Millisecond * time.Duration(rand.Intn(100)))
 	result := rand.Intn(2)
 	var err error
-	if result == 1 {
+	if result == 1 && failRandomly {
 		err = fmt.Errorf("Ack! Got an error!")
 	}
 	return err
+}
+
+func testDependency() error {
+	return testRandomFailure(true)
 }
 
 func printLongStats(msg string, c *goHystrix.Command) {
